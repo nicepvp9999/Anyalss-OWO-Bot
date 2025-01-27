@@ -1,0 +1,16 @@
+{
+  "name": "owo-bot",
+  "version": "1.0.0",
+  "description": "Discord Owo botu",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "author": "Your Name",
+  "license": "MIT",
+  "dependencies": {
+    "discord.js-selfbot-v13": "^1.0.0",
+    "axios": "^0.27.2",
+    "readline-sync": "^1.4.10"
+  }
+}
