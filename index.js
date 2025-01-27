@@ -9,19 +9,28 @@ const token = readline.question("> ", { hideEchoBack: true });
 console.log("⏳ Owo bot kanal ID'sini girin:");
 const owoChannelID = readline.question("> ");
 
+console.log("❓ Captcha API kullanmak istiyor musunuz? (Evet/Hayır):");
+const useCaptcha = readline.question("> ").toLowerCase() === "evet";
+
+let captchaApiUrl = null;
+if (useCaptcha) {
+    console.log("🔑 Captcha API URL'sini girin:");
+    captchaApiUrl = readline.question("> ");
+}
+
 const client = new Discord.Client();
 let startTime = Date.now();
-let isCaptchaActive = false;
 let minecraftHours = 272;
+let isCaptchaActive = false;
 
-// Rastgele zaman için yardımcı fonksiyon
+// Rastgele zaman aralığı için fonksiyon
 function randomInterval(min, max) {
     return Math.floor(Math.random() * (max - min + 1) + min);
 }
 
-// Owo komutlarını gönderme
+// OwO komut gönderme
 async function sendOwoCommand(cmd) {
-    if (isCaptchaActive) return; // Captcha varsa komutları durdur
+    if (isCaptchaActive) return; // CAPTCHA çözülüyorsa komut gönderme
     const channel = await client.channels.fetch(owoChannelID);
     if (channel) {
         await channel.send(cmd);
@@ -29,29 +38,36 @@ async function sendOwoCommand(cmd) {
     }
 }
 
-// Captcha çözme fonksiyonu (API Entegrasyonu)
+// CAPTCHA çözme (isteğe bağlı)
 async function solveCaptcha(imageUrl) {
-    console.log("⚠️ Captcha algılandı! Çözüm bekleniyor...");
-    
+    if (!useCaptcha) {
+        console.log("⚠️ CAPTCHA algılandı! Lütfen manuel çözüm yapın.");
+        return null;
+    }
+
+    console.log("⚠️ CAPTCHA algılandı! API üzerinden çözüm bekleniyor...");
     try {
-        let response = await axios.post("CAPTCHA_API_URL", { image: imageUrl });
+        const response = await axios.post(captchaApiUrl, { image: imageUrl });
         return response.data.solution;
     } catch (err) {
-        console.log("❌ Captcha çözülemedi, manuel çözmelisin.");
+        console.log("❌ CAPTCHA çözülemedi, manuel çözüm gerekli.");
         return null;
     }
 }
 
-// Taş takma fonksiyonu
+// En iyi taşları otomatik takma
 async function equipBestGem() {
-    const gems = ["weapon", "glove", "ring"];
-    for (let gem of gems) {
-        await sendOwoCommand(`owo equip ${gem}`);
-        await new Promise(r => setTimeout(r, 5000)); // 5 saniye bekle
-    }
+    await sendOwoCommand("owo winv");
+    setTimeout(async () => {
+        const gems = ["weapon", "glove", "ring"];
+        for (let gem of gems) {
+            await sendOwoCommand(`owo equip ${gem}`);
+            await new Promise(r => setTimeout(r, 5000)); // 5 saniye bekle
+        }
+    }, 5000);
 }
 
-// Bot açıldığında çalışacak
+// Bot hazır olduğunda çalışacak
 client.on("ready", async () => {
     console.log(`✅ Bağlandı: ${client.user.username}`);
     console.log(`⏳ Owo komutları ${owoChannelID} kanalında çalışacak.`);
@@ -62,22 +78,57 @@ client.on("ready", async () => {
         client.user.setActivity(`${minecraftHours} saatdir Minecraft oynuyor`, { type: "PLAYING" });
     }, 3600000);
 
-    // Otomatik taş takma (başlangıçta)
-    await equipBestGem();
-
-    // Otomatik `wh` ve `wb` (15-20 saniye arası)
+    // Otomatik `wh` ve `wb` komutları
     setInterval(() => {
         sendOwoCommand("owo wh");
         sendOwoCommand("owo wb");
     }, randomInterval(15000, 20000));
 
-    // Otomatik `wsell all` (1 saatte bir)
+    // Otomatik `wsell all`
     setInterval(() => {
         sendOwoCommand("owo wsell all");
     }, 3600000);
 });
 
-// Komutları dinleme
+// Lootbox ve taş işlemleri
+client.on("messageCreate", async (message) => {
+    if (message.channel.id !== owoChannelID) return;
+
+    if (message.content.includes("Congratulations") || message.content.includes("lootbox")) {
+        await sendOwoCommand("owo wlb all");
+        await sendOwoCommand("owo wwc all");
+    }
+
+    if (message.content.includes("Your inventory is empty")) {
+        await equipBestGem();
+    }
+});
+
+// CAPTCHA algılama ve çözüm
+client.on("messageCreate", async (message) => {
+    if (message.channel.id !== owoChannelID) return;
+
+    if (message.embeds.length > 0) {
+        let embed = message.embeds[0];
+
+        if (embed.title && embed.title.includes("Verification")) {
+            isCaptchaActive = true;
+            let imageUrl = embed.image?.url;
+
+            if (imageUrl) {
+                let solution = await solveCaptcha(imageUrl);
+                if (solution) {
+                    await sendOwoCommand(solution);
+                    console.log("✅ CAPTCHA çözüldü, devam ediliyor...");
+                }
+            }
+
+            isCaptchaActive = false;
+        }
+    }
+});
+
+// Özel komutlar
 client.on("messageCreate", async (message) => {
     if (message.author.id !== client.user.id) return;
     const args = message.content.split(" ");
@@ -101,39 +152,6 @@ client.on("messageCreate", async (message) => {
 
     if (command === "!help") {
         message.channel.send("Komutlar: `!say mesaj`, `!send @kullanıcı miktar`, `!bilgi`, `!help`");
-    }
-});
-
-// Captcha algılama ve durdurma
-client.on("messageCreate", async (message) => {
-    if (message.channel.id !== owoChannelID) return;
-
-    if (message.embeds.length > 0) {
-        let embed = message.embeds[0];
-
-        if (embed.title && embed.title.includes("Verification")) {
-            isCaptchaActive = true;
-            let imageUrl = embed.image?.url;
-
-            if (imageUrl) {
-                let solution = await solveCaptcha(imageUrl);
-                if (solution) {
-                    await sendOwoCommand(solution);
-                    console.log("✅ Captcha çözüldü, devam ediliyor...");
-                }
-            }
-
-            isCaptchaActive = false;
-        }
-    }
-});
-
-// Kutu açma `wlb all` ve `wwc all`
-client.on("messageCreate", async (message) => {
-    if (message.channel.id !== owoChannelID) return;
-    if (message.content.includes("Congratulations") || message.content.includes("lootbox")) {
-        sendOwoCommand("owo wlb all");
-        sendOwoCommand("owo wwc all");
     }
 });
 
