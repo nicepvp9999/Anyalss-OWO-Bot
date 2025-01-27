@@ -1,4 +1,4 @@
-const Discord = require("discord.js-selfbot-v13");
+const Discord = require("discord.js-selfbot-v13");  // v13 için
 const axios = require("axios");
 const readline = require("readline-sync");
 
